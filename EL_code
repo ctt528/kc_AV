@@ -1,0 +1,186 @@
+
+
+{Rolling ATR. Candles admitted into system must be 830-1500. 
+	If ATRLength = 24. 
+	And on a 60min chart, the time is at 9am. 
+	The ATR takes into account 14, 15, 9, 10, 11, 12, 13, 14, 15, 9, 10, 11, 12, 13, 14, 15, 9, 10, 11, 12, 13, 14, 15, 9
+	}
+
+	// "update everytick" so the current range is right
+	//Bars back: ATRLength + (100) = 124
+	
+	//DOES NOT change the data if the chart has 1000 bars back compared to 200 bars. Just need 100 and that can prob be changed
+	//Just takes into account the last 100 bars(their atr and range). Since the first bars ATR is taken into account, It needs ATRLength(24) additional.  
+	
+	
+	
+	Once clearprintlog;
+	Inputs:
+		ATRLength(24),
+		Starttime(0830),
+		Endtime(1500),
+		PlotLinesOnChart(true),
+		PlotLinesUnderChart(False),
+		Printt(False);
+	
+	
+	Vars:
+		min60Counter(0),
+		min60Array2SUM(0),
+		min60Array2AVG(0),
+		min60Counter2(0),
+		ii(0),
+		counter(0),
+		TruerangeSD(0),
+		TruerangeStandardDev(0),
+		iii(0),
+		variance(0),
+		pop(0),
+		sumArraySUM(0),
+		timecheck(false),
+		InsideOneSD(0),
+		InsideTwoSD(0),
+		Count(0),
+		iiNum(0);
+		
+		
+	
+	
+	arrays:
+		min60Array[] (0),
+		min60Array2[] (0),
+		TRArray[] (0),
+		ATRArray[] (0),
+		DateArray[] (0),
+		SumArray[] (0);	
+		
+		
+If time >= Starttime and time <= Endtime then timecheck = true else timecheck = false;
+If timecheck = true then 
+begin
+{if bartype = 1 and barinterval = 60 then //9,10,11,12,13,14,15}
+BEGIN
+	min60Counter = min60Counter + 1;
+	
+	Array_setmaxindex(min60Array, min60Counter); 
+	min60Array[min60Counter] = ticks[0];	
+	//When counter is 96, remember to go back just 24. so from 72 to 96
+	if min60Counter > ATRLength then
+	begin
+		//Condition1 = true;
+		For ii = min60Counter downto (min60Counter-ATRLength)
+		Begin
+			If ii = min60counter then min60counter2 = 0;
+			min60counter2 = min60counter2 + 1;
+			
+			array_setmaxindex(min60Array2, 	min60counter2);
+			min60Array2[min60Counter2] = min60Array[ii]; 	
+			If min60Counter2 = ATRLength then	//once we have 24 true ranges, compute avg
+			Begin
+				min60Array2SUM = array_sum(min60Array2, 0, min60Counter2);
+				Min60Array2AVG = iff(min60Counter2 <> 0, min60Array2SUM / min60Counter2, 1);//compute avg of the 24 true ranges. 
+				
+				
+				//SD
+				counter = counter + 1;
+				array_setmaxindex(TRArray, counter);
+				TRArray[counter] = ticks;
+				array_setmaxindex(ATRArray, counter);
+				ATRArray[counter] = Min60Array2AVG;
+				array_setmaxindex(DateArray, counter);//just to check date
+				DateArray[counter] = Date;//just to check date
+				If counter > 100 then
+				Begin
+					For iii = counter downto (counter-100)
+					Begin
+						Array_setmaxindex(SumArray, counter);
+						SumArray[iii] = Power((TRArray[iii]-ATRArray[iii]),2);
+						sumArraySUM = array_sum(SumArray, iii, counter);
+						pop = counter - iii;
+						variance = iff(pop<>0, sumArraySUM / pop ,1);
+						TruerangeStandardDev = Squareroot(variance);
+		//Print(counter, "   ", iii,"   ",TRarray[iii],"  ", ATRArray[iii]);
+					end;
+				end;		
+
+			End;
+		End;
+	End;
+			
+END;
+if PlotLinesUnderChart = true Then
+begin
+	plot1(Min60Array2AVG, !("ATR"));
+	plot2(Min60Array2AVG + TruerangeStandardDev, !("+1SD") );
+	plot3(Min60Array2AVG - TruerangeStandardDev, !("-SD") );
+	plot5(Min60Array2AVG + (TruerangeStandardDev*2), !("+2SD") );
+	//plot6(Min60Array2AVG - (TruerangeStandardDev*2), !("-2SD") );
+	plot7(Min60Array2AVG + (TruerangeStandardDev*3), !("+3SD") );
+	//plot8(Min60Array2AVG - (TruerangeStandardDev*3), !("-3SD") );
+	plot9(Min60Array2AVG + (TruerangeStandardDev*4), !("+4SD") );
+	//plot10(Min60Array2AVG - (TruerangeStandardDev*4), !("-4SD") );
+	plot4(ticks , !("currentbar") );
+	If ticks < (Min60Array2AVG - TruerangeStandardDev) then setplotcolor(4, cyan);
+end;
+{//Compute StdDev
+SDCounter = SDcounter + 1;
+if condition1 = true then 
+begin
+	ATRArray[SDCounter] = Min60Array2AVG;
+End;
+If SDCounter > 100 then //100 atr's! many days!
+Begin	
+	//need true ranges
+	//need avg true ranges of each true range
+}
+
+//added this portion below from kc_ACB(flawless)
+if PlotLinesOnChart = true and timecheck = true and date = currentdate Then
+Begin
+	//plot10(open + Min60Array2AVG, !("ATR"));
+	plot11(low[0] + (Min60Array2AVG + (TruerangeStandardDev*0)), !("+ATR.") );
+	setplotcolor(11, red);
+	plot12(high[0] - (Min60Array2AVG + (TruerangeStandardDev*0)), !("-ATR.") );
+	setplotcolor(12, red);
+	plot13(low[0] + (Min60Array2AVG + (TruerangeStandardDev*1)), !("+1SD.") );
+	setplotcolor(13, DarkGray);
+	plot14(high[0] - (Min60Array2AVG + (TruerangeStandardDev*1)), !("-1SD.") );
+	setplotcolor(14, DarkGray);
+	plot15(low[0] + (Min60Array2AVG + (TruerangeStandardDev*2)), !("+2SD.") );
+	setplotcolor(15, DarkGray);
+	plot16(high[0] - (Min60Array2AVG + (TruerangeStandardDev*2)), !("-2SD.") );
+	setplotcolor(16, DarkGray);
+end;
+
+If truerangestandarddev > 0 and Min60Array2AVG > 0 and timecheck = true then
+Begin
+if lastbaronchart then 
+Begin
+	For iiNum = 100 downto 0
+	begin
+	if ticks[iiNum]  <= Min60Array2AVG[iiNum] + (TruerangeStandarddev[iiNum] * 1) {and absvalue( close[1] - close ) >= ACBvalue} then InsideOneSD = InsideOneSD + 1;
+	if ticks[iiNum] <= Min60Array2AVG[iiNum] + (TruerangeStandarddev[iiNum] *2) {and absvalue( close[1] - close ) >= ACBvalue - (TruerangeStandarddev *1)} then InsidetwoSD = InsidetwoSD + 1;
+ 	Count = count + 1;
+ 	if iiNum=0 then begin count=0; InsideOneSD=0; InsidetwoSD=0; end; 
+	if printt = true then print("The last ", count, " bars, ", iff(count<>0, InsideoneSD/count,1)*100, " % of them were within 1SD(.5). ", "And ", iff(count<>0, InsidetwoSD/count,1)*100, " % of them were within 2SD(1.5)");
+	end;
+	end;
+end;
+//
+
+End;//in between times.
+
+
+
+
+
+
+//if bartype = 1 and barinterval = 15 then //845,9,915,930,945,10,1015,1030,1045,11,1115,1130,1145,12,1215,1230,1245,13,1315,1330,1345,14,1415,1430,1445,15
+
+//if bartype = 1 and barinterval = 5 then	//835,840,845,850,855,9,905,910,915,920,925,930,935,940,945,950,955,10,..
+
+//if bartype = 1 and barinterval = 3 then
+
+
+
+
